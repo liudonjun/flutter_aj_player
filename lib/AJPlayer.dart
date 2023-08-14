@@ -4,8 +4,11 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:aj_player/AJPlayerUtils.dart';
-import 'package:aj_player/AJThumbImage.dart';
-import 'package:aj_player/AJTrackShape.dart';
+import 'package:aj_player/widget/ButtonControlsWidget.dart';
+import 'package:aj_player/widget/CenterLockedWidget.dart';
+import 'package:aj_player/widget/LinearBufferedWidget.dart';
+import 'package:aj_player/widget/PercentTagWidget.dart';
+import 'package:aj_player/widget/TopControlsWidget.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
@@ -106,10 +109,6 @@ class _AJPlayerState extends State<AJPlayer> with TickerProviderStateMixin {
   Duration _positionValue = const Duration(seconds: 0);
 
   double _bufferedValue = 0.0; // 缓冲进度
-
-  // 是否全屏
-  bool get _isFullScreen =>
-      MediaQuery.of(context).orientation == Orientation.landscape;
 
   void log(String msg) {
     if (widget.debugLog!) {
@@ -516,6 +515,26 @@ class _AJPlayerState extends State<AJPlayer> with TickerProviderStateMixin {
     }
   }
 
+  // 播放器空白区域单机
+  void _onVideoTap() {
+    setState(() {
+      _isLockedControlsVisible = !_isLockedControlsVisible;
+    });
+    if (!_isLocked) {
+      if (_controlsVisible) {
+        _hideControls();
+      } else {
+        _showControls();
+      }
+    }
+    if (_isLockedControlsVisible) {
+      _lockAnimationController?.reverse();
+    } else {
+      _lockAnimationController?.forward();
+    }
+    _startHideControlsTimer();
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -535,24 +554,7 @@ class _AJPlayerState extends State<AJPlayer> with TickerProviderStateMixin {
       onHorizontalDragUpdate: _onHorizontalDragUpdate, // 根据手势更新快进或快退
       onHorizontalDragEnd: _onHorizontalDragEnd, // 手势结束seekTo
       onDoubleTap: _onDoubleTap,
-      onTap: () {
-        setState(() {
-          _isLockedControlsVisible = !_isLockedControlsVisible;
-        });
-        if (!_isLocked) {
-          if (_controlsVisible) {
-            _hideControls();
-          } else {
-            _showControls();
-          }
-        }
-        if (_isLockedControlsVisible) {
-          _lockAnimationController?.reverse();
-        } else {
-          _lockAnimationController?.forward();
-        }
-        _startHideControlsTimer();
-      },
+      onTap: _onVideoTap,
       child: Column(
         children: [
           Stack(
@@ -600,245 +602,81 @@ class _AJPlayerState extends State<AJPlayer> with TickerProviderStateMixin {
                 ),
 
               // 弹出层控件
-              Center(
-                child: Offstage(
-                  offstage: _offstage,
-                  child: Container(
-                    padding: const EdgeInsets.all(8.0),
-                    decoration: const BoxDecoration(
-                        color: Colors.black87,
-                        borderRadius: BorderRadius.all(Radius.circular(5.0))),
-                    child: Text(_percentage,
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 14)),
-                  ),
-                ),
+              PercentTagWidget(
+                message: _percentage,
+                offstage: _offstage,
               ),
               // 头部控件
-              Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: ClipRect(
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0, -1), // 开始位置（隐藏）
-                        end: const Offset(0, 0), // 结束位置（可见）
-                      ).animate(_animationController!),
-                      child: Container(
-                        padding: const EdgeInsets.all(8.0),
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            // 来点黑色到透明的渐变优雅一下
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                            colors: [
-                              Color.fromRGBO(0, 0, 0, 0),
-                              Color.fromRGBO(0, 0, 0, .7)
-                            ],
-                          ),
-                        ), // Add some background color
-                        child: Text(
-                          widget.title, // Replace with your desired title
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )),
+              TopControlsWidget(
+                title: widget.title,
+                animationController: _animationController!,
+              ),
               // 锁
-              Positioned(
-                  left: 16,
-                  child: ClipRect(
-                      child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(-1, 0), // 开始位置（隐藏）
-                      end: const Offset(0, 0), // 结束位置（可见）
-                    ).animate(_lockAnimationController!),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _isLocked = !_isLocked; // 切换锁定状态
-                            _isLockedControlsVisible = _isLocked; // 锁定状态下显示锁按钮
-                          });
-                          if (!_isLocked) {
-                            _showControls(); // 解锁时显示控件
-                          }
+              CenterLockedWidget(
+                isLocked: _isLocked,
+                lockAnimationController: _lockAnimationController!,
+                onClick: () {
+                  setState(() {
+                    _isLocked = !_isLocked; // 切换锁定状态
+                    _isLockedControlsVisible = _isLocked; // 锁定状态下显示锁按钮
+                  });
+                  if (!_isLocked) {
+                    _showControls(); // 解锁时显示控件
+                  }
 
-                          if (_isLocked) {
-                            _hideControls(); // 锁定时隐藏控件
-                            _lockAnimationController?.reverse();
-                          }
-                        },
-                        child: Icon(
-                          _isLocked ? Icons.lock : Icons.lock_open,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ))),
+                  if (_isLocked) {
+                    _hideControls(); // 锁定时隐藏控件
+                    _lockAnimationController?.reverse();
+                  }
+                },
+              ),
 
               // 底部控件
-              Positioned(
-                  left: 0,
-                  bottom: 0,
-                  right: 0,
-                  child: ClipRect(
-                    child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0, 1), // 开始位置（隐藏）
-                          end: const Offset(0, 0), // 结束位置（可见）
-                        ).animate(_animationController!),
-                        child: Container(
-                          height: 50, // Adjust the height as needed
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              // 来点黑色到透明的渐变优雅一下
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                              colors: [
-                                Color.fromRGBO(0, 0, 0, .7),
-                                Color.fromRGBO(0, 0, 0, 0)
-                              ],
-                            ),
-                          ), // Add some background color
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              IconButton(
-                                onPressed: () {
-                                  if (_controller.value.isPlaying) {
-                                    _controller.pause();
-                                  } else {
-                                    _controller.play();
-                                  }
-                                  if (_controlsVisible) {
-                                    _animationController
-                                        ?.forward(); // Slide down animation
-                                  } else {
-                                    _animationController
-                                        ?.reverse(); // Slide up animation
-                                  }
-                                },
-                                icon: Icon(
-                                  _controller.value.isPlaying
-                                      ? Icons.pause
-                                      : Icons.play_arrow,
-                                  size: 32,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                AJPlayerUtils.formatDuration(
-                                    _controller.value.position),
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: SliderTheme(
-                                  data: SliderThemeData(
-                                    trackHeight: 8,
-                                    inactiveTrackColor: Colors.grey,
-                                    activeTrackColor: const ui.Color.fromARGB(
-                                        255, 255, 255, 255),
-                                    thumbShape:
-                                        AJThumbImage(image: _customImage),
-                                    trackShape: const AJTrackShape(),
-                                  ),
-                                  child: Slider(
-                                    value: _progressValue,
-                                    onChanged: (value) {
-                                      if (value > widget.learnProgress! &&
-                                          _isDragging) {
-                                        setState(() {
-                                          _percentage = "不能拖拽到未学习的部分";
-                                          _offstage = false;
-                                          _isDragging = true;
-                                          _progressValue =
-                                              widget.learnProgress!;
-                                        });
-                                        return;
-                                      }
-                                      setState(() {
-                                        _progressValue = value;
-                                        _isDragging = true;
-                                      });
-                                    },
-                                    onChangeEnd: (value) {
-                                      setState(() {
-                                        _isDragging = false;
-                                      });
-                                      if (value > widget.learnProgress! &&
-                                          !_isDragging) {
-                                        setState(() {
-                                          _offstage = true;
-                                        });
-                                        final newPosition =
-                                            widget.learnProgress! *
-                                                _controller.value.duration
-                                                    .inMilliseconds;
-                                        _controller.seekTo(Duration(
-                                            milliseconds: newPosition.toInt()));
-                                        return;
-                                      }
-                                      final newPosition = value *
-                                          _controller
-                                              .value.duration.inMilliseconds;
-                                      _controller.seekTo(Duration(
-                                          milliseconds: newPosition.toInt()));
-                                    },
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                AJPlayerUtils.formatDuration(
-                                    _controller.value.duration),
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                              const SizedBox(width: 10),
-                              IconButton(
-                                onPressed: () {
-                                  if (_isFullScreen) {
-                                    AJPlayerUtils.setPortrait();
-                                  } else {
-                                    AJPlayerUtils.setLandscape();
-                                  }
-                                },
-                                icon: Icon(
-                                  _isFullScreen
-                                      ? Icons.fullscreen_exit
-                                      : Icons.fullscreen,
-                                  color: Colors.white,
-                                  size: 32,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )),
-                  )),
+              ButtonControlsWidget(
+                  animationController: _animationController!,
+                  controller: _controller,
+                  controlsVisible: _controlsVisible,
+                  customImage: _customImage!,
+                  progressValue: _progressValue,
+                  onChangeEnd: (value) {
+                    setState(() {
+                      _isDragging = false;
+                    });
+                    if (value > widget.learnProgress! && !_isDragging) {
+                      setState(() {
+                        _offstage = true;
+                      });
+                      final newPosition = widget.learnProgress! *
+                          _controller.value.duration.inMilliseconds;
+                      _controller
+                          .seekTo(Duration(milliseconds: newPosition.toInt()));
+                      return;
+                    }
+                    final newPosition =
+                        value * _controller.value.duration.inMilliseconds;
+                    _controller
+                        .seekTo(Duration(milliseconds: newPosition.toInt()));
+                  },
+                  onChanged: (value) {
+                    if (value > widget.learnProgress! && _isDragging) {
+                      setState(() {
+                        _percentage = "不能拖拽到未学习的部分";
+                        _offstage = false;
+                        _isDragging = true;
+                        _progressValue = widget.learnProgress!;
+                      });
+                      return;
+                    }
+                    setState(() {
+                      _progressValue = value;
+                      _isDragging = true;
+                    });
+                  }),
               //  缓冲条
               if (_bufferedValue != 1)
-                Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: ClipRect(
-                      child: LinearProgressIndicator(
-                        minHeight: 2,
-                        value: _bufferedValue,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                            ui.Color.fromARGB(255, 109, 107, 107)),
-                        backgroundColor: Colors.transparent,
-                      ),
-                    )),
+                LinearBufferedWidget(
+                  bufferedValue: _bufferedValue,
+                )
             ],
           ),
         ],
