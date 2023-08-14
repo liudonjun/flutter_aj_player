@@ -8,7 +8,7 @@ Add this to your package's pubspec.yaml file:
 
 ```yaml
 dependencies:
- flutter_pda_scan: 
+ flutter_aj_player: 
   git:
     url: https://github.com/liudonjun/flutter_aj_player
 ```
