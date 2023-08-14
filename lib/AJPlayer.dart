@@ -517,6 +517,15 @@ class _AJPlayerState extends State<AJPlayer> with TickerProviderStateMixin {
   }
 
   @override
+  void dispose() {
+    _controller.dispose();
+    _animationController?.dispose();
+    _lockAnimationController?.dispose();
+    _hideControlsTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onVerticalDragStart: _onVerticalDragStart,
